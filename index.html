@@ -35,14 +35,27 @@
     // Garda a sesión da app aquí, na páxina principal. No iPhone, Safari borra o que gardan
     // os iframes de Google cada vez que se pecha a app, pero isto si o conserva.
     var KEY = 'xfc_token';
+    // gárdase en localStorage e tamén nunha cookie deste dominio (se o iPhone borra un, queda o outro)
+    function ler() {
+      var t = null; try { t = localStorage.getItem(KEY); } catch (_) {}
+      if (!t) { var m = document.cookie.match(/(?:^|;\s*)xfc_token=([^;]+)/); if (m) { t = decodeURIComponent(m[1]); try { localStorage.setItem(KEY, t); } catch (_) {} } }
+      return t;
+    }
+    function gardar(t) {
+      try { if (t) localStorage.setItem(KEY, t); else localStorage.removeItem(KEY); } catch (_) {}
+      document.cookie = 'xfc_token=' + (t ? encodeURIComponent(t) : '') + '; path=/; max-age=' + (t ? 31536000 : 0) + '; secure; samesite=strict';
+      return ler() === (t || null);
+    }
+    function memoriaOk() { try { localStorage.setItem('xfc_t', '1'); var ok = localStorage.getItem('xfc_t') === '1'; localStorage.removeItem('xfc_t'); return ok; } catch (_) { return false; } }
+    var standalone = !!(navigator.standalone || (window.matchMedia && matchMedia('(display-mode: standalone)').matches));
     function deGoogle(origin) { try { return /(^|\.)googleusercontent\.com$/.test(new URL(origin).hostname); } catch (e) { return false; } }
     window.addEventListener('message', function (e) {
       if (!deGoogle(e.origin) || !e.data || typeof e.data !== 'object') return;
       if (e.data.xfc === 'get') {
-        var t = null; try { t = localStorage.getItem(KEY); } catch (_) {}
-        if (e.source) e.source.postMessage({ xfc: 'token', token: t }, e.origin);
+        if (e.source) e.source.postMessage({ xfc: 'token', token: ler(), info: { sa: standalone, ls: memoriaOk(), v: 2 } }, e.origin);
       } else if (e.data.xfc === 'set') {
-        try { if (e.data.token) localStorage.setItem(KEY, String(e.data.token)); else localStorage.removeItem(KEY); } catch (_) {}
+        var ok = gardar(e.data.token ? String(e.data.token) : '');
+        if (e.source) e.source.postMessage({ xfc: 'ack', ok: ok }, e.origin);
       }
     });
   </script>
